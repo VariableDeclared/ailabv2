@@ -61,10 +61,15 @@ resource "lxd_instance" "k8s" {
         path: /opt/instructions.txt
         permissions: 0600
         owner: root:root
-
+      - content: |
+          net.ipv4.ip_forward = 1
+        path: /etc/sysctl.d/0-ipforward.conf
+        permissions: 0600
+        owner: root:root
       runcmd:
-        - sudo swapoff -a
+        - swapoff -a
         - /opt/k8s-init.sh
+        - sysctl -p
 EOT
   }
 }
