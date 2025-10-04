@@ -54,7 +54,6 @@ resource "lxd_instance" "k8s" {
         path: /opt/k8s-init.sh
         permissions: 0700
         owner: root:root
-      write_files:
       - content: |
           mkdir -p $HOME/.kube
           sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
