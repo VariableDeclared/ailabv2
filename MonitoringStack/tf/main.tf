@@ -1,6 +1,7 @@
 resource "lxd_instance" "k8s" {
   name  = "k8s-stack"
   image = "ubuntu-daily:24.04"
+  instance-type = "virtual-machine"
 
   limits = {
     cpu = 2
@@ -11,7 +12,7 @@ resource "lxd_instance" "k8s" {
     "boot.autostart" = true
     "user.user-data" = <<-EOT
       #cloud-config
-      hostname: tf-cloudinit
+      # hostname: tf-cloudinit
       timezone: UTC
 
       package_update: true
