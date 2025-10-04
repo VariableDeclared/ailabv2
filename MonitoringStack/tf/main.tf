@@ -68,8 +68,9 @@ resource "lxd_instance" "k8s" {
         owner: root:root
       runcmd:
         - swapoff -a
-        - /opt/k8s-init.sh
         - sysctl -p
+        - /opt/k8s-init.sh
+
 EOT
   }
 }
