@@ -66,7 +66,6 @@ resource "lxd_instance" "k8s" {
       runcmd:
         - sudo swapoff -a
         - /opt/k8s-init.sh
-
-    EOT
+EOT
   }
 }
