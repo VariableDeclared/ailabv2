@@ -1,7 +1,7 @@
 resource "lxd_instance" "k8s" {
   name  = "k8s-stack"
   image = "ubuntu-daily:24.04"
-  instance-type = "virtual-machine"
+  type = "virtual-machine"
 
   limits = {
     cpu = 2
