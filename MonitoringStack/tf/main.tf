@@ -32,8 +32,8 @@ resource "lxd_instance" "k8s" {
           groups: sudo
           shell: /bin/bash
           sudo: ALL=(ALL) NOPASSWD:ALL
-          ssh_authorized_keys:
-            - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBu8meueQA8idgOrVV83hOAJBgMzwrdmAP2m6Vb3otA1
+          ssh_import_id:
+            - lp:pjds
 
       runcmd:
         - sudo swapoff -a
