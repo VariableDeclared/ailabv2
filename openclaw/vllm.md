@@ -1,6 +1,6 @@
-# vLLM quick setup
+# vLLM quick setup
 
-## Follow vLLM install with uv
+## Follow vLLM install with uv
 
 ```
 curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -10,7 +10,7 @@ source .venv/bin/activate
 uv pip install vllm --torch-backend=auto
 ```
 
-## vLLM backend (Plain vLLM server)
+## vLLM backend (Plain vLLM server)
 
 Grab the template file
 ```
