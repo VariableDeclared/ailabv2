@@ -12,3 +12,7 @@ cd vllm
 export VLLM_PRECOMPILED_WHEEL_VARIANT=cu131
 uv pip install --editable .
 ```
+
+## Known Issues:
+
+https://github.com/vllm-project/vllm/issues/27890
