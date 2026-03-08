@@ -4,13 +4,15 @@ import os
 
 
 class MikroTikManager:
-    def __init__(self, host, user, password, safe_mode=False):
+    def __init__(self, host, user, password):
         self.pool = routeros_api.RouterOsApiPool(
             host, 
             username=user, 
             password=password, 
             plaintext_login=True,
-            use_safe_mode=safe_mode
+            port=8729,
+            ssl_verify=False,
+            use_ssl=True
         )
         self.api = None
 
@@ -20,7 +22,19 @@ class MikroTikManager:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.pool.disconnect()
-
+    
+    def add_vlan(self, name, vlan_id, interface, comment=None):
+        """Creates a VLAN interface on top of a physical or bridge interface."""
+        vlan_resource = self.api.get_resource('/interface/vlan')
+        params = {
+            'name': name,
+            'vlan-id': str(vlan_id),
+            'interface': interface
+        }
+        if comment: params['comment'] = comment
+        
+        vlan_resource.add(**params)
+        print(f"VLAN '{name}' (ID: {vlan_id}) created on {interface}.")
     def add_vrf(self, name, interfaces, comment=None):
         """
         Creates a new VRF instance.
@@ -28,7 +42,7 @@ class MikroTikManager:
         :param interfaces: A list of interface names (e.g., ['ether2', 'vlan10']).
         :param comment: Optional description.
         """
-        vrf_resource = self.api.get_resource('/routing/vrf')
+        vrf_resource = self.api.get_resource('/ip/vrf')
         
         # Interfaces in the API must be a comma-separated string
         if isinstance(interfaces, list):
@@ -48,7 +62,7 @@ class MikroTikManager:
         except Exception as e:
             print(f"Failed to create VRF: {e}")
 
-    def add_firewall_rule(self, chain, action, protocol=None, dst_port=None, comment=None, extra_params={}):
+    def add_firewall_rule(self, chain, action, protocol=None, dst_port=None, comment=None, **extra_params):
         """
         Creates a new IPv4 firewall filter rule.
         """
@@ -117,11 +131,16 @@ class MikroTikManager:
 # Usage Example
 if __name__ == "__main__":
     # Using Safe Mode = True for network-sensitive changes
-    with MikroTikManager(os.environ["MIKROTIK_ENDPOINT"], os.environ["MIKROTIK_USER"], os.environ["MIKROTIK_PASSWORD"], safe_mode=True) as mt:
+    # TODO: Add Safe Mode API call.
+    with MikroTikManager(os.environ["MIKROTIK_ENDPOINT"], os.environ["MIKROTIK_USER"], os.environ["MIKROTIK_PASSWORD"]) as mt:
         # 1. Create a VRF named 'Customer_A'
         # 2. Assign ether2 and ether3 to it
+        vlan_name = "newTestVLAN"
+        # mt.add_vlan(vlan_name, 1234, "testBridge", "Testing MikroTik automation")
         mt.add_vrf(
             name='Customer_A', 
-            interfaces=['ether2', 'ether3'], 
+            interfaces=[vlan_name],
             comment='Isolated routing for Customer A'
         )
+
+
