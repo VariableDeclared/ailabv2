@@ -46,5 +46,31 @@ def main():
         # Always disconnect to free up the API slot
         connection.disconnect()
 
+def add_firewall_rule(api, chain, action, protocol=None, dst_port=None, comment=None, extra_params={}):
+    """
+    Creates a new IPv4 firewall filter rule.
+    """
+    firewall = api.get_resource('/ip/firewall/filter')
+    
+    # Construct the arguments dictionary
+    params = {
+        'chain': chain,
+        'action': action,
+    }
+    
+    # Add optional parameters if provided
+    if protocol:
+        params['protocol'] = protocol
+    if dst_port:
+        params['dst-port'] = str(dst_port)
+    if comment:
+        params['comment'] = comment
+    params.update(extra_params)
+    try:
+        firewall.add(**params)
+        print(f"Successfully added {action} rule to {chain} chain.")
+    except Exception as e:
+        print(f"Failed to add firewall rule: {e}")
+
 if __name__ == "__main__":
     main()
