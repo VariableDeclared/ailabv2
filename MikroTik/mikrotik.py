@@ -2,75 +2,126 @@
 import routeros_api
 import os
 
-def main():
-    connection = routeros_api.RouterOsApiPool(
-        '192.168.254.1',
-        username=os.environ["MIKROTIK_USER"],
-        password=os.environ["MIKROTIK_PASSWORD"],
-        plaintext_login=True, # Required for newer RouterOS versions via API
-        use_ssl=True,
-        ssl_verify=False,
-        port=8729
-    )
 
-    try:
-        # Establish the connection
-        api = connection.get_api()
+class MikroTikManager:
+    def __init__(self, host, user, password, safe_mode=False):
+        self.pool = routeros_api.RouterOsApiPool(
+            host, 
+            username=user, 
+            password=password, 
+            plaintext_login=True,
+            use_safe_mode=safe_mode
+        )
+        self.api = None
 
-        # 1. Get System Identity
-        # Equivalent to /system identity print
-        identity_resource = api.get_resource('/system/identity')
-        identity = identity_resource.get()
-        print(f"Device Identity: {identity[0]['name']}")
-        print("-" * 30)
+    def __enter__(self):
+        self.api = self.pool.get_api()
+        return self
 
-        # 2. Get All Interfaces
-        # Equivalent to /interface print
-        interface_resource = api.get_resource('/interface')
-        interfaces = interface_resource.get()
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.pool.disconnect()
 
-        print(f"{'Name':<20} {'Type':<15} {'Enabled':<10}")
-        for iface in interfaces:
-            name = iface.get('name')
-            type_ = iface.get('type')
-            disabled = iface.get('disabled')
-            
-            # Convert 'false' (disabled) to 'Yes' (enabled) for readability
-            status = "Yes" if disabled == 'false' else "No"
-            print(f"{name:<20} {type_:<15} {status:<10}")
+    def add_vrf(self, name, interfaces, comment=None):
+        """
+        Creates a new VRF instance.
+        :param name: The name of the VRF.
+        :param interfaces: A list of interface names (e.g., ['ether2', 'vlan10']).
+        :param comment: Optional description.
+        """
+        vrf_resource = self.api.get_resource('/routing/vrf')
+        
+        # Interfaces in the API must be a comma-separated string
+        if isinstance(interfaces, list):
+            interfaces = ",".join(interfaces)
 
-    except Exception as e:
-        print(f"An error occurred: {e}")
+        params = {
+            'name': name,
+            'interfaces': interfaces
+        }
+        
+        if comment:
+            params['comment'] = comment
+
+        try:
+            vrf_resource.add(**params)
+            print(f"VRF '{name}' created successfully with interfaces: {interfaces}")
+        except Exception as e:
+            print(f"Failed to create VRF: {e}")
+
+    def add_firewall_rule(self, chain, action, protocol=None, dst_port=None, comment=None, extra_params={}):
+        """
+        Creates a new IPv4 firewall filter rule.
+        """
+        firewall = self.api.get_resource('/ip/firewall/filter')
+        
+        # Construct the arguments dictionary
+        params = {
+            'chain': chain,
+            'action': action,
+        }
+        
+        # Add optional parameters if provided
+        if protocol:
+            params['protocol'] = protocol
+        if dst_port:
+            params['dst-port'] = str(dst_port)
+        if comment:
+            params['comment'] = comment
+        params.update(extra_params)
+        try:
+            firewall.add(**params)
+            print(f"Successfully added {action} rule to {chain} chain.")
+        except Exception as e:
+            print(f"Failed to add firewall rule: {e}")
     
-    finally:
-        # Always disconnect to free up the API slot
-        connection.disconnect()
+    def add_ip_address(self, address, interface, network=None, comment=None):
+        """Assigns an IP address to a specific interface."""
+        address_resource = self.api.get_resource('/ip/address')
+        params = {
+            'address': address, # Format: '192.168.10.1/24'
+            'interface': interface
+        }
+        if network: params['network'] = network
+        if comment: params['comment'] = comment
+        
+        address_resource.add(**params)
+        print(f"Assigned {address} to {interface}.")
 
-def add_firewall_rule(api, chain, action, protocol=None, dst_port=None, comment=None, extra_params={}):
-    """
-    Creates a new IPv4 firewall filter rule.
-    """
-    firewall = api.get_resource('/ip/firewall/filter')
-    
-    # Construct the arguments dictionary
-    params = {
-        'chain': chain,
-        'action': action,
-    }
-    
-    # Add optional parameters if provided
-    if protocol:
-        params['protocol'] = protocol
-    if dst_port:
-        params['dst-port'] = str(dst_port)
-    if comment:
-        params['comment'] = comment
-    params.update(extra_params)
-    try:
-        firewall.add(**params)
-        print(f"Successfully added {action} rule to {chain} chain.")
-    except Exception as e:
-        print(f"Failed to add firewall rule: {e}")
+    def modify_bridge(self, name, vlan_filtering=None, comment=None, frame_types=None, **extra_args):
+        """
+        Modifies an existing bridge interface. 
+        Useful for enabling 'vlan-filtering' which is disabled by default.
+        """
+        bridge_resource = self.api.get_resource('/interface/bridge')
+        
+        # Find the internal ID of the bridge by its name
+        bridge_data = bridge_resource.get(name=name)
+        if not bridge_data:
+            print(f"Error: Bridge '{name}' not found.")
+            return
 
+        bridge_id = bridge_data[0]['id']
+        params = {'id': bridge_id}
+        
+        # Update specific properties
+        if vlan_filtering is not None:
+            params['vlan-filtering'] = 'yes' if vlan_filtering else 'no'
+        if frame_types:
+            params['frame-types'] = frame_types # e.g., 'admit-only-vlan-tagged'
+        if comment:
+            params['comment'] = comment
+        params.update(extra_args)
+        bridge_resource.set(**params)
+        print(f"Bridge '{name}' updated successfully.")
+
+# Usage Example
 if __name__ == "__main__":
-    main()
+    # Using Safe Mode = True for network-sensitive changes
+    with MikroTikManager(os.environ["MIKROTIK_ENDPOINT"], os.environ["MIKROTIK_USER"], os.environ["MIKROTIK_PASSWORD"], safe_mode=True) as mt:
+        # 1. Create a VRF named 'Customer_A'
+        # 2. Assign ether2 and ether3 to it
+        mt.add_vrf(
+            name='Customer_A', 
+            interfaces=['ether2', 'ether3'], 
+            comment='Isolated routing for Customer A'
+        )
