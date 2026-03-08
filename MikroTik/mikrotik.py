@@ -4,11 +4,15 @@ import os
 
 
 class MikroTikManager:
+    FIREWALL_CHAIN_INPUT = "input"
+    FIREWALL_CHAIN_FORWARD = "forward"
+    FIREWALL_CHAIN_OUTPUT = "output"
+
     def __init__(self, host, user, password):
         self.pool = routeros_api.RouterOsApiPool(
-            host, 
-            username=user, 
-            password=password, 
+            host,
+            username=user,
+            password=password,
             plaintext_login=True,
             port=8729,
             ssl_verify=False,
@@ -22,7 +26,7 @@ class MikroTikManager:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.pool.disconnect()
-    
+
     def add_vlan(self, name, vlan_id, interface, comment=None):
         """Creates a VLAN interface on top of a physical or bridge interface."""
         vlan_resource = self.api.get_resource('/interface/vlan')
@@ -31,10 +35,12 @@ class MikroTikManager:
             'vlan-id': str(vlan_id),
             'interface': interface
         }
-        if comment: params['comment'] = comment
-        
+        if comment:
+            params['comment'] = comment
+
         vlan_resource.add(**params)
         print(f"VLAN '{name}' (ID: {vlan_id}) created on {interface}.")
+
     def add_vrf(self, name, interfaces, comment=None):
         """
         Creates a new VRF instance.
@@ -43,7 +49,7 @@ class MikroTikManager:
         :param comment: Optional description.
         """
         vrf_resource = self.api.get_resource('/ip/vrf')
-        
+
         # Interfaces in the API must be a comma-separated string
         if isinstance(interfaces, list):
             interfaces = ",".join(interfaces)
@@ -52,28 +58,29 @@ class MikroTikManager:
             'name': name,
             'interfaces': interfaces
         }
-        
+
         if comment:
             params['comment'] = comment
 
         try:
             vrf_resource.add(**params)
-            print(f"VRF '{name}' created successfully with interfaces: {interfaces}")
+            print(
+                f"VRF '{name}' created successfully with interfaces: {interfaces}")
         except Exception as e:
             print(f"Failed to create VRF: {e}")
 
-    def add_firewall_rule(self, chain, action, protocol=None, dst_port=None, comment=None, **extra_params):
+    def add_firewall_rule(self, chain, action, protocol=None, dst_port=None, comment=None, **kwargs):
         """
         Creates a new IPv4 firewall filter rule.
         """
         firewall = self.api.get_resource('/ip/firewall/filter')
-        
+
         # Construct the arguments dictionary
         params = {
             'chain': chain,
             'action': action,
         }
-        
+
         # Add optional parameters if provided
         if protocol:
             params['protocol'] = protocol
@@ -81,33 +88,35 @@ class MikroTikManager:
             params['dst-port'] = str(dst_port)
         if comment:
             params['comment'] = comment
-        params.update(extra_params)
+        params.update(kwargs)
         try:
             firewall.add(**params)
             print(f"Successfully added {action} rule to {chain} chain.")
         except Exception as e:
             print(f"Failed to add firewall rule: {e}")
-    
+
     def add_ip_address(self, address, interface, network=None, comment=None):
         """Assigns an IP address to a specific interface."""
         address_resource = self.api.get_resource('/ip/address')
         params = {
-            'address': address, # Format: '192.168.10.1/24'
+            'address': address,  # Format: '192.168.10.1/24'
             'interface': interface
         }
-        if network: params['network'] = network
-        if comment: params['comment'] = comment
-        
+        if network:
+            params['network'] = network
+        if comment:
+            params['comment'] = comment
+
         address_resource.add(**params)
         print(f"Assigned {address} to {interface}.")
 
-    def modify_bridge(self, name, vlan_filtering=None, comment=None, frame_types=None, **extra_args):
+    def modify_bridge(self, name, vlan_filtering=None, comment=None, frame_types=None, **kwargs):
         """
         Modifies an existing bridge interface. 
         Useful for enabling 'vlan-filtering' which is disabled by default.
         """
         bridge_resource = self.api.get_resource('/interface/bridge')
-        
+
         # Find the internal ID of the bridge by its name
         bridge_data = bridge_resource.get(name=name)
         if not bridge_data:
@@ -116,17 +125,58 @@ class MikroTikManager:
 
         bridge_id = bridge_data[0]['id']
         params = {'id': bridge_id}
-        
+
         # Update specific properties
         if vlan_filtering is not None:
             params['vlan-filtering'] = 'yes' if vlan_filtering else 'no'
         if frame_types:
-            params['frame-types'] = frame_types # e.g., 'admit-only-vlan-tagged'
+            # e.g., 'admit-only-vlan-tagged'
+            params['frame-types'] = frame_types
         if comment:
             params['comment'] = comment
         params.update(extra_args)
         bridge_resource.set(**params)
         print(f"Bridge '{name}' updated successfully.")
+    # --- RETRIEVAL METHODS ---
+
+    def get_vlans(self):
+        """Returns a list of all VLAN interfaces."""
+        return self.api.get_resource('/interface/vlan').get()
+
+    def get_vrfs(self):
+        """Returns a list of all VRF instances (RouterOS v7)."""
+        return self.api.get_resource('/routing/vrf').get()
+
+    def get_all_ip_addresses(self):
+        """Returns all configured IP addresses."""
+        return self.api.get_resource('/ip/address').get()
+
+    # --- REMOVAL METHOD (DYNAMIC) ---
+
+    def remove_by_name(self, resource_path, name):
+        """
+        Generic method to delete an item by its 'name' property.
+        :param resource_path: The API path (e.g., '/interface/vlan' or '/routing/vrf')
+        :param name: The name of the item to delete.
+        """
+        resource = self.api.get_resource(resource_path)
+        
+        # 1. Find the item to get its internal ID
+        items = resource.get(name=name)
+        
+        if not items:
+            print(f"Error: Item '{name}' not found at {resource_path}.")
+            return False
+
+        # 2. Extract the ID (usually first element) and remove it
+        item_id = items[0]['id']
+        try:
+            resource.remove(id=item_id)
+            print(f"Successfully removed '{name}' from {resource_path}.")
+            return True
+        except Exception as e:
+            print(f"Failed to remove '{name}': {e}")
+            return False
 
 # Usage Example
 if __name__ == "__main__":
@@ -135,12 +185,15 @@ if __name__ == "__main__":
     with MikroTikManager(os.environ["MIKROTIK_ENDPOINT"], os.environ["MIKROTIK_USER"], os.environ["MIKROTIK_PASSWORD"]) as mt:
         # 1. Create a VRF named 'Customer_A'
         # 2. Assign ether2 and ether3 to it
-        vlan_name = "newTestVLAN"
-        # mt.add_vlan(vlan_name, 1234, "testBridge", "Testing MikroTik automation")
-        mt.add_vrf(
-            name='Customer_A', 
-            interfaces=[vlan_name],
-            comment='Isolated routing for Customer A'
-        )
-
-
+        vlan_name = "vlanAISandbox"
+        import pdb; pdb.set_trace()
+        # mt.remove_by_name("/interface/vlan", name=vlan_name)
+        # mt.remove_by_name("/ip/vrf", "vrfAISandbox")
+        # mt.add_vlan(vlan_name, 1234, "testBridge",
+        #             "Testing MikroTik automation")
+        # mt.add_vrf(
+        #     name='vrfAISandbox',
+        #     interfaces=[vlan_name],
+        #     comment='Isolated routing for Customer A'
+        # )
+        mt.add_firewall_rule(MikroTikManager.FIREWALL_CHAIN_INPUT, "drop", None, None, "TEST_DENY_ALL", in_interface="vrfAISandbox")
