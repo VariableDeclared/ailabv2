@@ -1,4 +1,3 @@
-# vibe coded from Gemini, needs fixing
 import routeros_api
 import os
 
