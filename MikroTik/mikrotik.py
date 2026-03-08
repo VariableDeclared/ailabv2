@@ -182,11 +182,11 @@ class MikroTikManager:
 if __name__ == "__main__":
     # Using Safe Mode = True for network-sensitive changes
     # TODO: Add Safe Mode API call.
+    # TODO: Add --quick
     with MikroTikManager(os.environ["MIKROTIK_ENDPOINT"], os.environ["MIKROTIK_USER"], os.environ["MIKROTIK_PASSWORD"]) as mt:
         # 1. Create a VRF named 'Customer_A'
         # 2. Assign ether2 and ether3 to it
         vlan_name = "vlanAISandbox"
-        import pdb; pdb.set_trace()
         # mt.remove_by_name("/interface/vlan", name=vlan_name)
         # mt.remove_by_name("/ip/vrf", "vrfAISandbox")
         # mt.add_vlan(vlan_name, 1234, "testBridge",
