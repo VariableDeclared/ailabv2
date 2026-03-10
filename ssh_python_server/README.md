@@ -1,5 +1,4 @@
-Gemini said
-SSH Key Sync: Simple API & Polling Client
+# SSH Key Sync: Simple API & Polling Client
 This project provides a lightweight, automated way to manage and distribute public SSH keys across a fleet of servers. It consists of a Centralized Flask API (the "Source of Truth") and a Python Polling Client that runs on target machines to keep their local key stores up to date.
 
 ## Architecture Overview
@@ -70,4 +69,3 @@ Production SSL: In a production environment, wrap the Flask app in a production 
 Environment Variables: Move the API_SECRET out of the source code and into an .env file or system environment variable.
 
 Authorized Keys: To use this for real SSH access, point the client's LOCAL_KEY_STORE to ~/.ssh/authorized_keys (ensure proper file permissions).
-
