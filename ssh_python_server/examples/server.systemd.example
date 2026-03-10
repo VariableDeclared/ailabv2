@@ -1,0 +1,26 @@
+[Unit]
+Description=SSH Updater Client
+After=network.target
+
+[Service]
+# The user and group the service will run under
+User=USER
+# Group=www-data
+
+# The directory where your code lives
+WorkingDirectory=/opt/ssh_updater
+
+# Path to the python binary in the virtual environment
+# followed by the path to your script
+ExecStart=gunicorn --certfile=cert.pem --keyfile=key.pem -b 0.0.0.0:5001 ssh_updater:server
+
+# Automatically restart the service if it crashes
+Restart=always
+RestartSec=5
+
+# Optional: Set environment variables (like API keys or Flask/Django settings)
+# Environment=DEBUG=False
+# Environment=DATABASE_URL=postgres://user:pass@localhost/db
+
+[Install]
+WantedBy=multi-user.target
